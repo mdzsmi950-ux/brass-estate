@@ -50,17 +50,7 @@
   </div>
 </div>
   
-const NOTES_KEY = 'brassEstateGeneralNotes';
 
-const notesEl = document.getElementById('generalNotes');
-if (notesEl) {
-  const savedNotes = localStorage.getItem(NOTES_KEY);
-  if (savedNotes) notesEl.value = savedNotes;
-
-  notesEl.addEventListener('input', () => {
-    localStorage.setItem(NOTES_KEY, notesEl.value);
-  });
-}
   
   <table>
     <thead>
@@ -87,7 +77,18 @@ if (notesEl) {
     const rowsEl = document.getElementById('rows');
     let entries = [];
     let nextId = 1;
-
+   
+    const NOTES_KEY = 'brassEstateGeneralNotes';
+    
+    const notesEl = document.getElementById('generalNotes');
+    if (notesEl) {
+      const savedNotes = localStorage.getItem(NOTES_KEY);
+      if (savedNotes) notesEl.value = savedNotes;
+    
+      notesEl.addEventListener('input', () => {
+        localStorage.setItem(NOTES_KEY, notesEl.value);
+      });
+    }
     function newEntry(parentId = null, note = '', fraction = '', status = 'unconfirmed', percent = '') {
       return { id: nextId++, parentId, note, fraction, percent, status, source: percent ? 'percent' : 'fraction' };
     }
