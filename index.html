@@ -36,6 +36,19 @@
     .indentGuide { color: #aaa; font-size: 13px; padding-top: 7px; white-space: nowrap; }
     .summaryTable th, .summaryTable td { font-size: 13px; }
     .summaryTable td:first-child { font-weight: bold; }
+      th {
+      position: relative;
+    }
+
+    th .resizer {
+      width: 5px;
+      height: 100%;
+      position: absolute;
+      right: 0;
+      top: 0;
+      cursor: col-resize;
+      user-select: none;
+    }
   </style>
 </head>
 <body>
@@ -57,13 +70,16 @@
     <div class="panelTitle">Current Owner Summary, Lowest-Level Rows Only</div>
     <table class="summaryTable">
       <thead>
-        <tr>
-          <th>Owner / Leaf Row</th>
-          <th style="width:135px;">Fraction</th>
-          <th style="width:135px;">Percentage</th>
-          <th style="width:110px;">1440 Units</th>
-        </tr>
-      </thead>
+      <tr>
+        <th>Note / Owner<div class="resizer"></div></th>
+        <th style="width: 135px;">Fraction<div class="resizer"></div></th>
+        <th style="width: 135px;">Percentage<div class="resizer"></div></th>
+        <th style="width: 110px;">1440 Units<div class="resizer"></div></th>
+        <th style="width: 120px;">Status<div class="resizer"></div></th>
+        <th style="width: 80px;">Count<div class="resizer"></div></th>
+        <th style="width: 175px;">Action<div class="resizer"></div></th>
+      </tr>
+    </thead>
       <tbody id="ownerSummary"></tbody>
     </table>
   </div>
@@ -383,6 +399,32 @@
     function addRootRow() {
       entries.push(newEntry());
       render();
+
+    // column resize logic
+    document.querySelectorAll('th').forEach((th, index) => {
+      const resizer = th.querySelector('.resizer');
+      if (!resizer) return;
+
+      let startX, startWidth;
+
+      resizer.addEventListener('mousedown', (e) => {
+        startX = e.pageX;
+        startWidth = th.offsetWidth;
+
+        function onMouseMove(e) {
+          const newWidth = startWidth + (e.pageX - startX);
+          th.style.width = newWidth + 'px';
+        }
+
+        function onMouseUp() {
+          document.removeEventListener('mousemove', onMouseMove);
+          document.removeEventListener('mouseup', onMouseUp);
+        }
+
+        document.addEventListener('mousemove', onMouseMove);
+        document.addEventListener('mouseup', onMouseUp);
+      });
+    });
     }
 
     function addChild(parentId) {
