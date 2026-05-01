@@ -76,6 +76,7 @@
         <th style="width: 135px;">Percentage</th>
         <th style="width: 110px;">1440 Units</th>
         <th style="width: 120px;">Status</th>
+        <th style="width: 80px;">Count</th>
         <th style="width: 175px;">Action</th>
       </tr>
     </thead>
@@ -99,7 +100,7 @@
     let nextId = 1;
 
     function newEntry(parentId = null, note = '', fraction = '', status = 'unconfirmed', percent = '') {
-      return { id: nextId++, parentId, note, fraction, percent, status, source: percent ? 'percent' : 'fraction' };
+      return { id: nextId++, parentId, note, fraction, percent, status, source: percent ? 'percent' : 'fraction', countInGrand: true };
     }
 
     function saveData() {
@@ -119,7 +120,8 @@
           fraction: e.fraction || '',
           percent: e.percent || '',
           status: e.status || 'unconfirmed',
-          source: e.source || (e.percent ? 'percent' : 'fraction')
+          source: e.source || (e.percent ? 'percent' : 'fraction'),
+          countInGrand: e.countInGrand === false ? false : true
         }));
         nextId = parsed.nextId || Math.max(0, ...entries.map(e => e.id || 0)) + 1;
         return true;
@@ -214,6 +216,12 @@
       return roots().flatMap(root => leafRows(root));
     }
 
+    function countedLeaves() {
+      return roots()
+        .filter(root => root.countInGrand !== false)
+        .flatMap(root => leafRows(root));
+    }
+
     function escapeHtml(value) {
       return String(value || '')
         .replaceAll('&', '&amp;')
@@ -255,6 +263,9 @@
             <option value="unconfirmed" ${entry.status === 'unconfirmed' ? 'selected' : ''}>Unconfirmed</option>
             <option value="confirmed" ${entry.status === 'confirmed' ? 'selected' : ''}>Confirmed</option>
           </select>
+        </td>
+        <td style="text-align:center;">
+          ${level === 0 ? `<input type="checkbox" class="countInput" ${entry.countInGrand !== false ? 'checked' : ''}>` : ''}
         </td>
         <td>
           <button class="small addSubBtn" type="button">Divide</button>
@@ -302,6 +313,16 @@
         saveData();
       });
 
+      const countInput = tr.querySelector('.countInput');
+      if (countInput) {
+        countInput.addEventListener('input', e => {
+          entry.countInGrand = e.target.checked;
+          updateTotals();
+          renderOwnerSummary();
+          saveData();
+        });
+      }
+
       tr.querySelector('.addSubBtn').addEventListener('click', () => addChild(entry.id));
       tr.querySelector('.deleteBtn').addEventListener('click', () => deleteEntry(entry.id));
 
@@ -317,7 +338,7 @@
           <td>${decimalToFraction(proved)}</td>
           <td>${formatPercent(proved)}</td>
           <td>${(proved * 1440).toFixed(3).replace(/\.000$/, '')}</td>
-          <td colspan="2">Claimed parent: ${decimalToFraction(claimed)} / ${formatPercent(claimed)}. Difference: ${decimalToFraction(diff)} / ${formatPercent(diff)}</td>
+          <td colspan="3">Claimed parent: ${decimalToFraction(claimed)} / ${formatPercent(claimed)}. Difference: ${decimalToFraction(diff)} / ${formatPercent(diff)}</td>
         `;
         rowsEl.appendChild(sumTr);
       }
@@ -330,7 +351,7 @@
     }
 
     function updateTotals() {
-      const total = allLeaves().reduce((sum, leaf) => sum + claimedDecimal(leaf), 0);
+      const total = countedLeaves().reduce((sum, leaf) => sum + claimedDecimal(leaf), 0);
       const units = total * 1440;
       document.getElementById('totalPercent').textContent = formatPercent(total);
       document.getElementById('totalFraction').textContent = decimalToFraction(total);
@@ -339,7 +360,7 @@
 
     function renderOwnerSummary() {
       const totals = {};
-      allLeaves().forEach(leaf => {
+      countedLeaves().forEach(leaf => {
         const name = (leaf.note || 'Unassigned').trim();
         totals[name] = (totals[name] || 0) + claimedDecimal(leaf);
       });
