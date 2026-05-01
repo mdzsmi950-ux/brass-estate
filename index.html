@@ -17,8 +17,7 @@
     th { background: #efefef; text-align: left; font-size: 13px; }
     input, textarea, select { width: 100%; box-sizing: border-box; border: 1px solid #ccc; border-radius: 5px; padding: 6px; font-family: inherit; font-size: 13px; }
     textarea { min-height: 42px; resize: vertical; }
-    .units, .percentDisplay { white-space: nowrap; font-weight: bold; }
-    .hint { font-size: 11px; color: #777; margin-top: 4px; }
+    .units { white-space: nowrap; font-weight: bold; }
     .unconfirmed { color: #9aa0a6; }
     .confirmed { color: #000; }
     .hasChildren { background: #fbfbfb; }
@@ -28,8 +27,7 @@
     .match { background: #f1fff4; }
     button { border: none; border-radius: 6px; padding: 8px 10px; cursor: pointer; font-size: 13px; margin-right: 4px; }
     .add { background: #222; color: white; margin-top: 12px; }
-    .small { background: #eee; color: #333; }
-    .delete { background: #eee; color: #333; }
+    .small, .delete { background: #eee; color: #333; }
     .controls { margin-top: 12px; }
     .treeLabel { display: flex; gap: 6px; align-items: flex-start; }
     .indentGuide { color: #aaa; font-size: 13px; padding-top: 7px; white-space: nowrap; }
@@ -60,19 +58,37 @@
   </table>
 
   <div class="controls">
-    <button class="add" onclick="addRootRow()">Add Main Row</button>
-    <button onclick="copyCsv()">Copy CSV</button>
-    <button onclick="clearRows()">Clear</button>
+    <button class="add" id="addMainBtn" type="button">Add Main Row</button>
+    <button id="copyCsvBtn" type="button">Copy CSV</button>
+    <button id="clearBtn" type="button">Clear</button>
   </div>
 
   <script>
-    const rowsEl = document.getElementById('rows');
     const STORAGE_KEY = 'brassEstateLedgerData';
+    const rowsEl = document.getElementById('rows');
     let entries = [];
     let nextId = 1;
 
     function newEntry(parentId = null, note = '', fraction = '', status = 'unconfirmed', percent = '') {
       return { id: nextId++, parentId, note, fraction, percent, status, source: percent ? 'percent' : 'fraction' };
+    }
+
+    function saveData() {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({ entries, nextId }));
+    }
+
+    function loadData() {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      if (!saved) return false;
+      try {
+        const parsed = JSON.parse(saved);
+        if (!Array.isArray(parsed.entries)) return false;
+        entries = parsed.entries;
+        nextId = parsed.nextId || Math.max(0, ...entries.map(e => e.id || 0)) + 1;
+        return true;
+      } catch (error) {
+        return false;
+      }
     }
 
     function gcd(a, b) {
@@ -84,7 +100,7 @@
 
     function simplify(n, d) {
       const f = gcd(n, d);
-      return `${Math.round(n / f)}/${Math.round(d / f)}`;
+      return Math.round(n / f) + '/' + Math.round(d / f);
     }
 
     function parseFraction(value) {
@@ -96,16 +112,14 @@
         return parts[0] / parts[1];
       }
       const number = Number(cleaned);
-      if (!Number.isFinite(number)) return null;
-      return number;
+      return Number.isFinite(number) ? number : null;
     }
 
     function parsePercent(value) {
       const cleaned = String(value || '').replace('%', '').trim();
       if (!cleaned) return null;
       const number = Number(cleaned);
-      if (!Number.isFinite(number)) return null;
-      return number / 100;
+      return Number.isFinite(number) ? number / 100 : null;
     }
 
     function formatPercent(decimal) {
@@ -133,43 +147,32 @@
       return childrenOf(id).length > 0;
     }
 
-    function leafDecimal(entry) {
-      const kids = childrenOf(entry.id);
-      if (kids.length === 0) return entryDecimal(entry) || 0;
-      return kids.reduce((sum, child) => sum + leafDecimal(child), 0);
-    }
-
     function claimedDecimal(entry) {
       return entryDecimal(entry) || 0;
     }
 
+    function leafDecimal(entry) {
+      const kids = childrenOf(entry.id);
+      if (kids.length === 0) return claimedDecimal(entry);
+      return kids.reduce((sum, child) => sum + leafDecimal(child), 0);
+    }
+
     function roots() {
-      return entries.filter(e => e.parentId === null);
+      return entries.filter(e => e.parentId === null || e.parentId === undefined);
     }
 
-    function saveData() {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify({ entries, nextId }));
-    }
-
-    function loadData() {
-      const saved = localStorage.getItem(STORAGE_KEY);
-      if (!saved) return false;
-
-      try {
-        const parsed = JSON.parse(saved);
-        if (!Array.isArray(parsed.entries)) return false;
-        entries = parsed.entries;
-        nextId = parsed.nextId || Math.max(0, ...entries.map(e => e.id || 0)) + 1;
-        return true;
-      } catch {
-        return false;
-      }
+    function escapeHtml(value) {
+      return String(value || '')
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;')
+        .replaceAll('"', '&quot;');
     }
 
     function render() {
       rowsEl.innerHTML = '';
       roots().forEach(root => renderEntry(root, 0));
-      calculateGrandTotal();
+      updateTotals();
       saveData();
     }
 
@@ -179,8 +182,9 @@
       const proved = leafDecimal(entry);
       const hasKids = kids.length > 0;
       const units = claimed * 1440;
+
       const tr = document.createElement('tr');
-      tr.className = `${entry.status === 'confirmed' ? 'confirmed' : 'unconfirmed'} ${hasKids ? 'hasChildren' : ''}`;
+      tr.className = (entry.status === 'confirmed' ? 'confirmed' : 'unconfirmed') + (hasKids ? ' hasChildren' : '');
       tr.dataset.id = entry.id;
       tr.innerHTML = `
         <td>
@@ -199,8 +203,8 @@
           </select>
         </td>
         <td>
-          <button class="small" onclick="addChild(${entry.id})">Add sub</button>
-          <button class="delete" onclick="deleteEntry(${entry.id})">X</button>
+          <button class="small addSubBtn" type="button">Add sub</button>
+          <button class="delete deleteBtn" type="button">X</button>
         </td>
       `;
       rowsEl.appendChild(tr);
@@ -209,6 +213,7 @@
         entry.note = e.target.value;
         saveData();
       });
+      tr.querySelector('.noteInput').addEventListener('blur', render);
 
       tr.querySelector('.fractionInput').addEventListener('input', e => {
         entry.fraction = e.target.value;
@@ -218,34 +223,38 @@
           entry.percent = formatPercent(decimal);
           tr.querySelector('.percentInput').value = entry.percent;
         }
-        updateCalculatedDisplays();
+        updateLiveRow(tr, entry);
+        updateTotals();
         saveData();
       });
+      tr.querySelector('.fractionInput').addEventListener('blur', render);
 
       tr.querySelector('.percentInput').addEventListener('input', e => {
         entry.percent = e.target.value;
         entry.source = 'percent';
-        updateCalculatedDisplays();
+        updateLiveRow(tr, entry);
+        updateTotals();
         saveData();
       });
+      tr.querySelector('.percentInput').addEventListener('blur', render);
 
       tr.querySelector('.statusSelect').addEventListener('input', e => {
         entry.status = e.target.value;
         tr.classList.remove('confirmed', 'unconfirmed');
         tr.classList.add(entry.status === 'confirmed' ? 'confirmed' : 'unconfirmed');
         saveData();
-      });stener('blur', () => render());();
-    tr.querySelector('.percentInput').addEventListener('input', e => {
-        entry.percent = e.target.value;
-        entry.source = 'percent';
-        updateCalculatedDisplays();
-        saveData();
       });
-      tr.querySelector('.percentInput').addEventListener('blur', () => render());
+
+      tr.querySelector('.addSubBtn').addEventListener('click', () => addChild(entry.id));
+      tr.querySelector('.deleteBtn').addEventListener('click', () => deleteEntry(entry.id));
+
+      kids.forEach(child => renderEntry(child, level + 1));
+
+      if (hasKids) {
         const diff = proved - claimed;
         const matched = Math.abs(diff) < 0.000001;
         const sumTr = document.createElement('tr');
-        sumTr.className = `sumRow ${matched ? 'match' : 'mismatch'}`;
+        sumTr.className = 'sumRow ' + (matched ? 'match' : 'mismatch');
         sumTr.innerHTML = `
           <td><div style="padding-left:${(level + 1) * 28}px">Subtotal for: ${escapeHtml(entry.note || 'parent row')}</div></td>
           <td>${decimalToFraction(proved)}</td>
@@ -257,27 +266,19 @@
       }
     }
 
-    function calculateGrandTotal() {
+    function updateLiveRow(row, entry) {
+      const decimal = claimedDecimal(entry);
+      const units = decimal * 1440;
+      const unitsCell = row.querySelector('.units');
+      unitsCell.textContent = Number.isInteger(units) ? units : units.toFixed(3);
+    }
+
+    function updateTotals() {
       const total = roots().reduce((sum, root) => sum + leafDecimal(root), 0);
       const units = total * 1440;
       document.getElementById('totalPercent').textContent = formatPercent(total);
       document.getElementById('totalFraction').textContent = decimalToFraction(total);
-      document.getElementById('totalUnits').textContenfunction updateCalculatedDisplays() {
-      document.querySelectorAll('tr.ledgerRow').forEach(row => {
-        const id = Number(row.dataset.id);
-        const entry = entries.find(e => e.id === id);
-        if (!entry) return;
-        const decimal = claimedDecimal(entry);
-        const unitsCell = row.querySelector('.units');
-        if (unitsCell) {
-          const units = decimal * 1440;
-          unitsCell.textContent = Number.isInteger(units) ? units : units.toFixed(3);
-        }
-      });
-      calculateGrandTotal();
-    }
-
-    function calculateGrandTotal() {000$/, '') + ' / 1440';
+      document.getElementById('totalUnits').textContent = units.toFixed(3).replace(/\.000$/, '') + ' / 1440';
     }
 
     function addRootRow() {
@@ -306,7 +307,7 @@
       entries = [];
       nextId = 1;
       localStorage.removeItem(STORAGE_KEY);
-      addRootRow();
+      render();
     }
 
     function flattenRows() {
@@ -344,13 +345,9 @@
       alert('CSV copied.');
     }
 
-    function escapeHtml(value) {
-      return String(value || '')
-        .replaceAll('&', '&amp;')
-        .replaceAll('<', '&lt;')
-        .replaceAll('>', '&gt;')
-        .replaceAll('"', '&quot;');
-    }
+    document.getElementById('addMainBtn').addEventListener('click', addRootRow);
+    document.getElementById('copyCsvBtn').addEventListener('click', copyCsv);
+    document.getElementById('clearBtn').addEventListener('click', clearRows);
 
     if (!loadData()) {
       entries.push(newEntry(null, 'Carl Brass, from lawyer report', '111/360', 'unconfirmed'));
