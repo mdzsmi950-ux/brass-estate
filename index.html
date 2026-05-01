@@ -24,17 +24,8 @@
     .unconfirmed { color: #9aa0a6; }
     .confirmed { color: #000; }
     .hasChildren { background: #fbfbfb; }
-.sumRow {
-  background: #f0f4f8;
-  font-weight: bold;
-}
-
-.sumRow td {
-  border-top: 2px solid #b8c2cc;
-  white-space: normal;
-  word-break: break-word;
-  overflow-wrap: anywhere;
-}
+    .sumRow { background: #f0f4f8; font-weight: bold; }
+    .sumRow td { border-top: 2px solid #b8c2cc; }
     .mismatch { background: #fff1f0; }
     .match { background: #f1fff4; }
     button { border: none; border-radius: 6px; padding: 8px 10px; cursor: pointer; font-size: 13px; margin-right: 4px; }
@@ -50,12 +41,6 @@
     .resizer { width: 8px; height: 100%; position: absolute; top: 0; right: -4px; cursor: col-resize; user-select: none; z-index: 5; }
       .dragHandle:active { cursor: grabbing; }
     .draggingRow { opacity: 0.45; }
-
-    .ledgerTable td:nth-child(2),
-.ledgerTable th:nth-child(2) {
-  min-width: 320px;
-}
-    
   </style>
 </head>
 <body>
@@ -404,7 +389,8 @@
         const sumTr = document.createElement('tr');
         sumTr.className = 'sumRow ' + (matched ? 'match' : 'mismatch');
         sumTr.innerHTML = `
-          <td><div style="padding-left:${(level + 1) * 28}px">Division subtotal, direct subrows counted, for: ${escapeHtml(entry.note || 'parent row')}</div></td>
+          <td></td>
+          <td><div style="padding-left:${level * 28}px">Division subtotal for: ${escapeHtml(entry.note || 'parent row')}</div></td>
           <td>${decimalToFraction(proved)}</td>
           <td>${formatPercent(proved)}</td>
           <td>${(proved * 1440).toFixed(3).replace(/\.000$/, '')}</td>
