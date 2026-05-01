@@ -39,6 +39,8 @@
     .ledgerWrap { overflow-x: auto; }
     .ledgerTable { min-width: 1000px; }
     .resizer { width: 8px; height: 100%; position: absolute; top: 0; right: -4px; cursor: col-resize; user-select: none; z-index: 5; }
+      .dragHandle:active { cursor: grabbing; }
+    .draggingRow { opacity: 0.45; }
   </style>
 </head>
 <body>
@@ -74,6 +76,7 @@
   <div class="ledgerWrap">
     <table class="ledgerTable" id="ledgerTable">
       <colgroup>
+        <col style="width: 60px;">
         <col style="width: 420px;">
         <col style="width: 140px;">
         <col style="width: 140px;">
@@ -84,13 +87,14 @@
       </colgroup>
       <thead>
         <tr>
-          <th>Note / Owner<div class="resizer" data-col="0"></div></th>
-          <th>Fraction<div class="resizer" data-col="1"></div></th>
-          <th>Percentage<div class="resizer" data-col="2"></div></th>
-          <th>1440 Units<div class="resizer" data-col="3"></div></th>
-          <th>Status<div class="resizer" data-col="4"></div></th>
-          <th>Count<div class="resizer" data-col="5"></div></th>
-          <th>Action<div class="resizer" data-col="6"></div></th>
+          <th>Move<div class="resizer" data-col="0"></div></th>
+          <th>Note / Owner<div class="resizer" data-col="1"></div></th>
+          <th>Fraction<div class="resizer" data-col="2"></div></th>
+          <th>Percentage<div class="resizer" data-col="3"></div></th>
+          <th>1440 Units<div class="resizer" data-col="4"></div></th>
+          <th>Status<div class="resizer" data-col="5"></div></th>
+          <th>Count<div class="resizer" data-col="6"></div></th>
+          <th>Action<div class="resizer" data-col="7"></div></th>
         </tr>
       </thead>
       <tbody id="rows"></tbody>
@@ -251,6 +255,26 @@
       saveData();
     }
 
+    function siblingEntries(entry) {
+      return entries.filter(e => (e.parentId ?? null) === (entry.parentId ?? null));
+    }
+
+    function moveEntryWithinSameLayer(dragId, targetId) {
+      if (dragId === targetId) return;
+      const dragEntry = entries.find(e => e.id === dragId);
+      const targetEntry = entries.find(e => e.id === targetId);
+      if (!dragEntry || !targetEntry) return;
+      if ((dragEntry.parentId ?? null) !== (targetEntry.parentId ?? null)) return;
+
+      const siblings = siblingEntries(dragEntry);
+      const others = entries.filter(e => (e.parentId ?? null) !== (dragEntry.parentId ?? null));
+      const reordered = siblings.filter(e => e.id !== dragId);
+      const targetIndex = reordered.findIndex(e => e.id === targetId);
+      reordered.splice(targetIndex, 0, dragEntry);
+      entries = [...others, ...reordered];
+      render();
+    }
+
     function renderEntry(entry, level) {
       const kids = childrenOf(entry.id);
       const claimed = claimedDecimal(entry);
@@ -262,6 +286,7 @@
       tr.className = (entry.status === 'confirmed' ? 'confirmed' : 'unconfirmed') + (hasKids ? ' hasChildren' : '');
       tr.dataset.id = entry.id;
       tr.innerHTML = `
+        <td style="text-align:center; vertical-align:middle; cursor:grab;" class="dragHandle" draggable="true">☰</td>
         <td>
           <div class="treeLabel" style="padding-left:${level * 28}px">
             <div class="indentGuide">${level > 0 ? '↳' : ''}</div>
@@ -286,6 +311,23 @@
         </td>
       `;
       rowsEl.appendChild(tr);
+
+      const dragHandle = tr.querySelector('.dragHandle');
+      dragHandle.addEventListener('dragstart', e => {
+        e.dataTransfer.setData('text/plain', String(entry.id));
+        tr.classList.add('draggingRow');
+      });
+      dragHandle.addEventListener('dragend', () => {
+        tr.classList.remove('draggingRow');
+      });
+      tr.addEventListener('dragover', e => {
+        e.preventDefault();
+      });
+      tr.addEventListener('drop', e => {
+        e.preventDefault();
+        const dragId = Number(e.dataTransfer.getData('text/plain'));
+        moveEntryWithinSameLayer(dragId, entry.id);
+      });
 
       tr.querySelector('.noteInput').addEventListener('input', e => {
         entry.note = e.target.value;
