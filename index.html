@@ -416,12 +416,17 @@
 
     function renderOwnerSummary() {
       const totals = {};
+      let summaryTotal = 0;
+
       countedRows().forEach(entry => {
         const name = (entry.note || 'Unassigned').trim();
-        totals[name] = (totals[name] || 0) + claimedDecimal(entry);
+        const decimal = claimedDecimal(entry);
+        totals[name] = (totals[name] || 0) + decimal;
+        summaryTotal += decimal;
       });
 
       ownerSummaryEl.innerHTML = '';
+
       Object.keys(totals).sort().forEach(name => {
         const decimal = totals[name];
         const units = decimal * 1440;
@@ -434,6 +439,18 @@
         `;
         ownerSummaryEl.appendChild(tr);
       });
+
+      const totalUnits = summaryTotal * 1440;
+      const totalTr = document.createElement('tr');
+      totalTr.style.fontWeight = 'bold';
+      totalTr.style.background = '#f0f4f8';
+      totalTr.innerHTML = `
+        <td>Total</td>
+        <td>${decimalToFraction(summaryTotal)}</td>
+        <td>${formatPercent(summaryTotal)}</td>
+        <td>${totalUnits.toFixed(3).replace(/\.000$/, '')}</td>
+      `;
+      ownerSummaryEl.appendChild(totalTr);
     }
 
     function addRootRow() {
