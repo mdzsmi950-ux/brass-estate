@@ -67,6 +67,7 @@
 
   <script>
     const rowsEl = document.getElementById('rows');
+    const STORAGE_KEY = 'brassEstateLedgerData';
     let entries = [];
     let nextId = 1;
 
@@ -146,10 +147,30 @@
       return entries.filter(e => e.parentId === null);
     }
 
+    function saveData() {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({ entries, nextId }));
+    }
+
+    function loadData() {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      if (!saved) return false;
+
+      try {
+        const parsed = JSON.parse(saved);
+        if (!Array.isArray(parsed.entries)) return false;
+        entries = parsed.entries;
+        nextId = parsed.nextId || Math.max(0, ...entries.map(e => e.id || 0)) + 1;
+        return true;
+      } catch {
+        return false;
+      }
+    }
+
     function render() {
       rowsEl.innerHTML = '';
       roots().forEach(root => renderEntry(root, 0));
       calculateGrandTotal();
+      saveData();
     }
 
     function renderEntry(entry, level) {
@@ -247,8 +268,10 @@
     }
 
     function clearRows() {
+      if (!confirm('Clear all ledger rows?')) return;
       entries = [];
       nextId = 1;
+      localStorage.removeItem(STORAGE_KEY);
       addRootRow();
     }
 
@@ -295,9 +318,12 @@
         .replaceAll('"', '&quot;');
     }
 
-    entries.push(newEntry(null, 'Carl Brass, from lawyer report', '111/360', 'unconfirmed'));
-    entries.push(newEntry(1, 'Example sublayer: Clara Brass line share', '23/360', 'unconfirmed'));
-    entries.push(newEntry(1, 'Example sublayer: Paul Brass conveyed share', '23/360', 'unconfirmed'));
+    if (!loadData()) {
+      entries.push(newEntry(null, 'Carl Brass, from lawyer report', '111/360', 'unconfirmed'));
+      entries.push(newEntry(1, 'Example sublayer: Clara Brass line share', '23/360', 'unconfirmed'));
+      entries.push(newEntry(1, 'Example sublayer: Paul Brass conveyed share', '23/360', 'unconfirmed'));
+    }
+
     render();
   </script>
 </body>
