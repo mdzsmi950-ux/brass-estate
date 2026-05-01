@@ -205,24 +205,43 @@
       `;
       rowsEl.appendChild(tr);
 
-      tr.querySelector('.noteInput').addEventListener('input', e => { entry.note = e.target.value; });
+      tr.querySelector('.noteInput').addEventListener('input', e => {
+        entry.note = e.target.value;
+        saveData();
+      });
+
       tr.querySelector('.fractionInput').addEventListener('input', e => {
         entry.fraction = e.target.value;
         entry.source = 'fraction';
         const decimal = parseFraction(entry.fraction);
-        if (decimal !== null) entry.percent = formatPercent(decimal);
-        render();
+        if (decimal !== null) {
+          entry.percent = formatPercent(decimal);
+          tr.querySelector('.percentInput').value = entry.percent;
+        }
+        updateCalculatedDisplays();
+        saveData();
       });
+
       tr.querySelector('.percentInput').addEventListener('input', e => {
         entry.percent = e.target.value;
         entry.source = 'percent';
-        render();
+        updateCalculatedDisplays();
+        saveData();
       });
-      tr.querySelector('.statusSelect').addEventListener('input', e => { entry.status = e.target.value; render(); });
 
-      kids.forEach(child => renderEntry(child, level + 1));
-
-      if (hasKids) {
+      tr.querySelector('.statusSelect').addEventListener('input', e => {
+        entry.status = e.target.value;
+        tr.classList.remove('confirmed', 'unconfirmed');
+        tr.classList.add(entry.status === 'confirmed' ? 'confirmed' : 'unconfirmed');
+        saveData();
+      });stener('blur', () => render());();
+    tr.querySelector('.percentInput').addEventListener('input', e => {
+        entry.percent = e.target.value;
+        entry.source = 'percent';
+        updateCalculatedDisplays();
+        saveData();
+      });
+      tr.querySelector('.percentInput').addEventListener('blur', () => render());
         const diff = proved - claimed;
         const matched = Math.abs(diff) < 0.000001;
         const sumTr = document.createElement('tr');
@@ -243,7 +262,22 @@
       const units = total * 1440;
       document.getElementById('totalPercent').textContent = formatPercent(total);
       document.getElementById('totalFraction').textContent = decimalToFraction(total);
-      document.getElementById('totalUnits').textContent = units.toFixed(3).replace(/\.000$/, '') + ' / 1440';
+      document.getElementById('totalUnits').textContenfunction updateCalculatedDisplays() {
+      document.querySelectorAll('tr.ledgerRow').forEach(row => {
+        const id = Number(row.dataset.id);
+        const entry = entries.find(e => e.id === id);
+        if (!entry) return;
+        const decimal = claimedDecimal(entry);
+        const unitsCell = row.querySelector('.units');
+        if (unitsCell) {
+          const units = decimal * 1440;
+          unitsCell.textContent = Number.isInteger(units) ? units : units.toFixed(3);
+        }
+      });
+      calculateGrandTotal();
+    }
+
+    function calculateGrandTotal() {000$/, '') + ' / 1440';
     }
 
     function addRootRow() {
