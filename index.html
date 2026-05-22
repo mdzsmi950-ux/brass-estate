@@ -50,7 +50,21 @@
   <div class="summary">
     <div class="box"><div class="label">Grand Total Percentage</div><div class="value" id="totalPercent">0%</div></div>
     <div class="box"><div class="label">Grand Total Fraction</div><div class="value" id="totalFraction">0/1</div></div>
-    <div class="box"><div class="label">Grand Total 1440 Units</div><div class="value" id="totalUnits">0 / 1440</div></div>
+    <div class="box">
+      <div class="label">
+        Grand Total
+        <input
+          id="unitBaseInput"
+          type="number"
+          min="1"
+          step="1"
+          value="1440"
+          style="width:70px; padding:4px; border:1px solid #cbd5e1; border-radius:6px;"
+        />
+        Units
+      </div>
+      <div class="value" id="totalUnits">0 / 1440</div>
+    </div>
   </div>
 
   <div class="panel">
@@ -66,7 +80,7 @@
           <th>Owner / Leaf Row</th>
           <th style="width:135px;">Fraction</th>
           <th style="width:135px;">Percentage</th>
-          <th style="width:110px;">1440 Units</th>
+          <th style="width:110px;"><span class="unitBaseLabel">1440</span> Units</th>
         </tr>
       </thead>
       <tbody id="ownerSummary"></tbody>
@@ -91,7 +105,7 @@
           <th>Note / Owner<div class="resizer" data-col="1"></div></th>
           <th>Fraction<div class="resizer" data-col="2"></div></th>
           <th>Percentage<div class="resizer" data-col="3"></div></th>
-          <th>1440 Units<div class="resizer" data-col="4"></div></th>
+          <th><span class="unitBaseLabel">1440</span> Units<div class="resizer" data-col="4"></div></th>
           <th>Status<div class="resizer" data-col="5"></div></th>
           <th>Count<div class="resizer" data-col="6"></div></th>
           <th>Action<div class="resizer" data-col="7"></div></th>
@@ -109,7 +123,16 @@
 
   <script>
     const STORAGE_KEY = 'brassEstateLedgerData';
+    
     const NOTES_KEY = 'brassEstateGeneralNotes';
+    
+    const UNIT_BASE_KEY = 'estateOwnershipUnitBase';
+    
+    let unitBase = Number(localStorage.getItem(UNIT_BASE_KEY)) || 1440;
+    
+    function formatNumber(value) {
+      return Number.isInteger(value) ? String(value) : value.toFixed(3).replace(/\.000$/, '');
+    }
     const rowsEl = document.getElementById('rows');
     const ownerSummaryEl = document.getElementById('ownerSummary');
     const generalNotesEl = document.getElementById('generalNotes');
@@ -150,9 +173,29 @@
     }
 
     function saveNotes() {
-      localStorage.setItem(NOTES_KEY, generalNotesEl.value);
-    }
-
+              localStorage.setItem(NOTES_KEY, generalNotesEl.value);
+            }
+        const unitBaseInput = document.getElementById('unitBaseInput');
+        
+        unitBaseInput.value = unitBase;
+        
+        unitBaseInput.addEventListener('input', e => {
+          const nextValue = Number(e.target.value);
+        
+          if (!Number.isFinite(nextValue) || nextValue <= 0) return;
+        
+          unitBase = nextValue;
+        
+          localStorage.setItem(UNIT_BASE_KEY, String(unitBase));
+        
+          document.querySelectorAll('th').forEach(th => {
+            if (th.childNodes[0] && th.childNodes[0].nodeType === Node.TEXT_NODE) {
+              th.childNodes[0].textContent = th.childNodes[0].textContent.replace(/\d+ Units/, unitBase + ' Units');
+            }
+          });
+        
+          render();
+        });
     function loadNotes() {
       generalNotesEl.value = localStorage.getItem(NOTES_KEY) || '';
     }
@@ -195,8 +238,8 @@
 
     function decimalToFraction(decimal) {
       if (decimal === null || !Number.isFinite(decimal)) return '';
-      const units = Math.round(decimal * 1440 * 1000000) / 1000000;
-      if (Math.abs(units - Math.round(units)) < 0.000001) return simplify(Math.round(units), 1440);
+      const units = Math.round(decimal * unitBase * 1000000) / 1000000;
+      if (Math.abs(units - Math.round(units)) < 0.000001) return simplify(Math.round(units), unitBase);
       return decimal.toFixed(8).replace(/0+$/, '').replace(/\.$/, '');
     }
 
@@ -280,7 +323,7 @@
       const claimed = claimedDecimal(entry);
       const proved = directChildrenDecimal(entry);
       const hasKids = kids.length > 0;
-      const units = claimed * 1440;
+      const units = claimed * unitBase;
 
       const tr = document.createElement('tr');
       tr.className = (entry.status === 'confirmed' ? 'confirmed' : 'unconfirmed') + (hasKids ? ' hasChildren' : '');
@@ -388,16 +431,16 @@
 
     function updateLiveRow(row, entry) {
       const decimal = claimedDecimal(entry);
-      const units = decimal * 1440;
+      const units = decimal * unitBase;
       row.querySelector('.units').textContent = Number.isInteger(units) ? units : units.toFixed(3);
     }
 
     function updateTotals() {
       const total = countedRows().reduce((sum, entry) => sum + claimedDecimal(entry), 0);
-      const units = total * 1440;
+      const units = total * unitBase;
       document.getElementById('totalPercent').textContent = formatPercent(total);
       document.getElementById('totalFraction').textContent = decimalToFraction(total);
-      document.getElementById('totalUnits').textContent = units.toFixed(3).replace(/\.000$/, '') + ' / 1440';
+      document.getElementById('totalUnits').textContent = formatNumber(units) + ' / ' + unitBase;
     }
 
     function renderOwnerSummary() {
@@ -415,18 +458,18 @@
 
       Object.keys(totals).sort().forEach(name => {
         const decimal = totals[name];
-        const units = decimal * 1440;
+        const units = decimal * unitBase;
         const tr = document.createElement('tr');
         tr.innerHTML = `
           <td>${escapeHtml(name)}</td>
           <td>${decimalToFraction(decimal)}</td>
           <td>${formatPercent(decimal)}</td>
-          <td>${units.toFixed(3).replace(/\.000$/, '')}</td>
+          <td>${formatNumber(units)}</td>
         `;
         ownerSummaryEl.appendChild(tr);
       });
 
-      const totalUnits = summaryTotal * 1440;
+      const totalUnits = summaryTotal * unitBase;
       const totalTr = document.createElement('tr');
       totalTr.style.fontWeight = 'bold';
       totalTr.style.background = '#f0f4f8';
@@ -434,7 +477,7 @@
         <td>Total</td>
         <td>${decimalToFraction(summaryTotal)}</td>
         <td>${formatPercent(summaryTotal)}</td>
-        <td>${totalUnits.toFixed(3).replace(/\.000$/, '')}</td>
+        <td>${formatNumber(totalUnits)}</td>
       `;
       ownerSummaryEl.appendChild(totalTr);
     }
@@ -483,7 +526,7 @@
     }
 
     function copyCsv() {
-      const lines = [['Level','Note / Owner','Fraction','Percentage','1440 Units','Status','Counted In Current Owner Summary']];
+      const lines = [['Level','Note / Owner','Fraction','Percentage','unitBase Units','Status','Counted In Current Owner Summary']];
       flattenRows().forEach(item => {
         const decimal = claimedDecimal(item.entry);
         lines.push([
@@ -491,7 +534,7 @@
           item.entry.note,
           item.entry.fraction,
           item.entry.percent,
-          (decimal * 1440).toFixed(3).replace(/\.000$/, ''),
+          formatNumber(decimal * unitBase),
           item.entry.status,
           item.entry.countInGrand !== false ? 'Yes' : 'No'
         ]);
@@ -526,6 +569,29 @@
         });
       });
     }
+
+    const unitBaseInput = document.getElementById('unitBaseInput');
+
+    function updateUnitBaseLabels() {
+      document.querySelectorAll('.unitBaseLabel').forEach(el => {
+        el.textContent = unitBase;
+      });
+    }
+
+    unitBaseInput.value = unitBase;
+    updateUnitBaseLabels();
+
+    unitBaseInput.addEventListener('input', e => {
+      const nextValue = Number(e.target.value);
+
+      if (!Number.isFinite(nextValue) || nextValue <= 0) return;
+
+      unitBase = nextValue;
+      localStorage.setItem(UNIT_BASE_KEY, String(unitBase));
+
+      updateUnitBaseLabels();
+      render();
+    });
 
     document.getElementById('addMainBtn').addEventListener('click', addRootRow);
     document.getElementById('copyCsvBtn').addEventListener('click', copyCsv);
