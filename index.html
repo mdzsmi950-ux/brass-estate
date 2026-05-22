@@ -173,29 +173,15 @@
     }
 
     function saveNotes() {
-              localStorage.setItem(NOTES_KEY, generalNotesEl.value);
-            }
-        const unitBaseInput = document.getElementById('unitBaseInput');
-        
-        unitBaseInput.value = unitBase;
-        
-        unitBaseInput.addEventListener('input', e => {
-          const nextValue = Number(e.target.value);
-        
-          if (!Number.isFinite(nextValue) || nextValue <= 0) return;
-        
-          unitBase = nextValue;
-        
-          localStorage.setItem(UNIT_BASE_KEY, String(unitBase));
-        
-          document.querySelectorAll('th').forEach(th => {
-            if (th.childNodes[0] && th.childNodes[0].nodeType === Node.TEXT_NODE) {
-              th.childNodes[0].textContent = th.childNodes[0].textContent.replace(/\d+ Units/, unitBase + ' Units');
-            }
-          });
-        
-          render();
-        });
+      localStorage.setItem(NOTES_KEY, generalNotesEl.value);
+    }
+
+    function updateUnitBaseLabels() {
+      document.querySelectorAll('.unitBaseLabel').forEach(el => {
+        el.textContent = unitBase;
+      });
+    }
+
     function loadNotes() {
       generalNotesEl.value = localStorage.getItem(NOTES_KEY) || '';
     }
@@ -526,7 +512,7 @@
     }
 
     function copyCsv() {
-      const lines = [['Level','Note / Owner','Fraction','Percentage','unitBase Units','Status','Counted In Current Owner Summary']];
+      const lines = [['Level','Note / Owner','Fraction','Percentage',unitBase + ' Units','Status','Counted In Current Owner Summary']];
       flattenRows().forEach(item => {
         const decimal = claimedDecimal(item.entry);
         lines.push([
@@ -572,23 +558,15 @@
 
     const unitBaseInput = document.getElementById('unitBaseInput');
 
-    function updateUnitBaseLabels() {
-      document.querySelectorAll('.unitBaseLabel').forEach(el => {
-        el.textContent = unitBase;
-      });
-    }
-
     unitBaseInput.value = unitBase;
     updateUnitBaseLabels();
 
     unitBaseInput.addEventListener('input', e => {
       const nextValue = Number(e.target.value);
-
       if (!Number.isFinite(nextValue) || nextValue <= 0) return;
 
       unitBase = nextValue;
       localStorage.setItem(UNIT_BASE_KEY, String(unitBase));
-
       updateUnitBaseLabels();
       render();
     });
